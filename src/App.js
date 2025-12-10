@@ -1,121 +1,364 @@
-import React from "react";
-import "bootstrap/dist/css/bootstrap.min.css";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import "./App.css";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-export default function App() {
+const API = "http://localhost:9030/api/accounts";
+
+function App() {
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState("id");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [page, setPage] = useState(1);
+  const pageSize = 5;
+
+  const [formData, setFormData] = useState({
+    accountHolder: "",
+    email: "",
+    balance: ""
+  });
+
+  const [transaction, setTransaction] = useState({
+    id: "",
+    amount: ""
+  });
+
+  const [edit, setEdit] = useState(null);
+
+  const loadAccounts = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(API);
+      setAccounts(res.data);
+    } catch {
+      toast.error("❌ Failed to load accounts");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAccounts();
+  }, []);
+
+  const validateAccount = () => {
+    if (!formData.accountHolder.trim()) return "Name required";
+    if (!/^\S+@\S+\.\S+$/.test(formData.email)) return "Invalid Email";
+    if (formData.balance <= 0) return "Balance must be > 0";
+    return null;
+  };
+
+  const createAccount = async (e) => {
+    e.preventDefault();
+    const error = validateAccount();
+    if (error) return toast.warning(error);
+
+    try {
+      await axios.post(API, formData);
+      toast.success("✅ Account Created!");
+      setFormData({ accountHolder: "", email: "", balance: "" });
+      loadAccounts();
+    } catch {
+      toast.error("❌ Account creation failed");
+    }
+  };
+
+  const deposit = async () => {
+    if (!transaction.id || transaction.amount <= 0)
+      return toast.warning("Enter valid Account ID & Amount");
+
+    try {
+      await axios.put(`${API}/${transaction.id}/deposit`, {
+        amount: Number(transaction.amount),
+      });
+      toast.success("✅ Deposit Successful");
+      setTransaction({ id: "", amount: "" });
+      loadAccounts();
+    } catch {
+      toast.error("❌ Deposit failed");
+    }
+  };
+
+  const withdraw = async () => {
+    if (!transaction.id || transaction.amount <= 0)
+      return toast.warning("Enter valid Account ID & Amount");
+
+    try {
+      await axios.put(`${API}/${transaction.id}/withdraw`, {
+        amount: Number(transaction.amount),
+      });
+      toast.success("✅ Withdrawal Successful");
+      setTransaction({ id: "", amount: "" });
+      loadAccounts();
+    } catch {
+      toast.error("❌ Withdrawal failed — insufficient balance?");
+    }
+  };
+
+  const deleteAccount = async (id) => {
+    if (!window.confirm("Delete this account?")) return;
+
+    try {
+      await axios.delete(`${API}/${id}`);
+      toast.success("✅ Account Deleted");
+      loadAccounts();
+    } catch {
+      toast.error("❌ Delete Failed");
+    }
+  };
+
+  const updateAccount = async () => {
+    if (!edit.accountHolder.trim()) return toast.warning("Name required");
+    if (!/^\S+@\S+\.\S+$/.test(edit.email)) return toast.warning("Invalid Email");
+
+    try {
+      await axios.put(`${API}/${edit.id}`, edit);
+      toast.success("✅ Updated Successfully");
+      setEdit(null);
+      loadAccounts();
+    } catch {
+      toast.error("❌ Update Failed");
+    }
+  };
+
+  const filtered = accounts.filter((a) =>
+    a.accountHolder.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortOrder === "asc") return a[sortField] > b[sortField] ? 1 : -1;
+    return a[sortField] < b[sortField] ? 1 : -1;
+  });
+
+  const totalPages = Math.ceil(sorted.length / pageSize);
+  const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+  const changeSort = (field) => {
+    setSortField(field);
+    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+  };
+
   return (
-    <div className="bg-light text-dark">
-      {/* Navbar */}
-      <nav className="navbar navbar-expand-lg navbar-dark bg-dark p-3">
-        <div className="container">
-          <a className="navbar-brand fs-4 fw-bold" href="/">
-            Portfolio
-          </a>
-          <button
-            className="navbar-toggler"
-            type="button"
-            data-bs-toggle="collapse"
-            data-bs-target="#navbarNav"
-          >
-            <span className="navbar-toggler-icon"></span>
-          </button>
-          <div className="collapse navbar-collapse" id="navbarNav">
-            <ul className="navbar-nav ms-auto">
-              <li className="nav-item mx-2"><a className="nav-link" href="#about">About</a></li>
-              <li className="nav-item mx-2"><a className="nav-link" href="#skills">Skills</a></li>
-              <li className="nav-item mx-2"><a className="nav-link" href="#projects">Projects</a></li>
-              <li className="nav-item mx-2"><a className="nav-link" href="#contact">Contact</a></li>
-            </ul>
+    <div className="container mt-4 mb-5 fadeIn">
+
+      <ToastContainer position="top-right" theme="colored" />
+
+      <h2 className="text-center fw-bold mb-4">🏦 Account Management System</h2>
+
+      {/* ✅ Search */}
+      <input
+        type="text"
+        placeholder="🔍 Search Account Holder"
+        className="form-control mb-4 p-2"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+
+      {/* ✅ Create Account */}
+      <div className="card p-4 mb-4 shadow-lg rounded-4 zoom">
+        <h5 className="fw-semibold mb-3">Create New Account</h5>
+        <form onSubmit={createAccount}>
+          <div className="row gy-2">
+            <div className="col-md-4 col-12">
+              <input
+                type="text"
+                placeholder="Account Holder Name"
+                required
+                className="form-control py-2"
+                value={formData.accountHolder}
+                onChange={(e) =>
+                  setFormData({ ...formData, accountHolder: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="col-md-4 col-12">
+              <input
+                type="email"
+                placeholder="Email"
+                required
+                className="form-control py-2"
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="col-md-3 col-9">
+              <input
+                type="number"
+                placeholder="Initial Balance"
+                required
+                className="form-control py-2"
+                value={formData.balance}
+                onChange={(e) =>
+                  setFormData({ ...formData, balance: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="col-md-1 col-3 d-grid">
+              <button className="btn btn-primary fw-semibold">
+                Add
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      {/* ✅ Deposit / Withdraw */}
+      <div className="card p-4 mb-4 shadow-lg rounded-4 zoom">
+        <h5 className="fw-semibold mb-3">Deposit / Withdraw</h5>
+        <div className="row gy-2">
+          <div className="col-md-4 col-12">
+            <input
+              type="number"
+              placeholder="Account ID"
+              className="form-control py-2"
+              value={transaction.id}
+              onChange={(e) =>
+                setTransaction({ ...transaction, id: e.target.value })
+              }
+            />
+          </div>
+
+          <div className="col-md-4 col-12">
+            <input
+              type="number"
+              placeholder="Amount"
+              className="form-control py-2"
+              value={transaction.amount}
+              onChange={(e) =>
+                setTransaction({ ...transaction, amount: e.target.value })
+              }
+            />
+          </div>
+
+          <div className="col-md-2 col-6 d-grid">
+            <button className="btn btn-success fw-semibold" onClick={deposit}>
+              Deposit
+            </button>
+          </div>
+
+          <div className="col-md-2 col-6 d-grid">
+            <button className="btn btn-warning fw-semibold" onClick={withdraw}>
+              Withdraw
+            </button>
           </div>
         </div>
-      </nav>
+      </div>
 
-      {/* Hero Section */}
-      <section className="py-5 bg-dark text-light text-center">
-        <div className="container">
-          <h1 className="display-4 fw-bold">Vasudev Kumar</h1>
-          <p className="lead">Java Full Stack Developer</p>
-          <p className="mt-3 w-75 mx-auto">
-            I am a passionate and dedicated Java Full Stack Developer specializing in building modern, scalable, and efficient web applications. With strong expertise in Spring Boot, React, and MySQL, I love transforming ideas into powerful digital solutions.
-          </p>
-        </div>
-      </section>
+      {/* ✅ Loading Spinner */}
+      {loading && <div className="loading-spinner mx-auto my-3"></div>}
 
-      {/* About Section */}
-      <section id="about" className="py-5">
-        <div className="container">
-          <h2 className="fw-bold mb-4">About Me</h2>
-          <p className="fs-5">
-            I completed my Java Full Stack Developer course in 2024 from Raja Mahendra Pratap University. I have earned a Full Stack Java Certification from Ducate, where I worked on multiple real-world CRUD-based applications using Spring Boot, React, and MySQL.
-          </p>
-        </div>
-      </section>
+      {/* ✅ Accounts Table */}
+      <div className="card p-3 shadow-lg rounded-4 zoom">
+        <h5 className="fw-semibold mb-3">All Accounts</h5>
 
-      {/* Skills Section */}
-      <section id="skills" className="py-5 bg-light">
-        <div className="container">
-          <h2 className="fw-bold mb-4">Skills</h2>
-          <div className="row g-3">
-            {["HTML", "CSS", "JavaScript", "React", "Java", "Spring Boot", "MySQL", "Git"].map((skill) => (
-              <div key={skill} className="col-md-3">
-                <div className="border rounded p-3 text-center bg-white shadow-sm">
-                  {skill}
-                </div>
-              </div>
-            ))}
+        {paginated.length === 0 ? (
+          <div className="text-center p-5">
+            <img
+              src="https://cdn-icons-png.flaticon.com/512/4076/4076549.png"
+              alt="empty"
+              width="140"
+            />
+            <p className="mt-3 text-muted">No Accounts Found</p>
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-hover table-bordered text-center">
+              <thead className="table-dark">
+                <tr>
+                  <th onClick={() => changeSort("id")} style={{ cursor: "pointer" }}>ID</th>
+                  <th onClick={() => changeSort("accountHolder")} style={{ cursor: "pointer" }}>Account Holder</th>
+                  <th>Email</th>
+                  <th onClick={() => changeSort("balance")} style={{ cursor: "pointer" }}>Balance</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((acc) => (
+                  <tr key={acc.id} className="fadeInUp">
+                    <td>{acc.id}</td>
+                    <td>{acc.accountHolder}</td>
+                    <td>{acc.email}</td>
+                    <td>₹ {acc.balance}</td>
+                    <td>
+                      <button
+                        className="btn btn-sm btn-info me-2"
+                        onClick={() => setEdit(acc)}
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        className="btn btn-sm btn-danger"
+                        onClick={() => deleteAccount(acc.id)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* ✅ Pagination */}
+            <div className="d-flex justify-content-center gap-2 mt-3">
+              <button
+                className="btn btn-secondary"
+                disabled={page === 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Prev
+              </button>
+              <span className="fw-semibold pt-2">{page} / {totalPages}</span>
+              <button
+                className="btn btn-secondary"
+                disabled={page === totalPages}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ✅ Edit Modal */}
+      {edit && (
+        <div className="modal-overlay">
+          <div className="modal-box">
+            <h5>Edit Account</h5>
+
+            <input
+              className="form-control my-2"
+              value={edit.accountHolder}
+              onChange={(e) => setEdit({ ...edit, accountHolder: e.target.value })}
+            />
+
+            <input
+              className="form-control my-2"
+              value={edit.email}
+              onChange={(e) => setEdit({ ...edit, email: e.target.value })}
+            />
+
+            <button className="btn btn-success me-2" onClick={updateAccount}>
+              Save
+            </button>
+            <button className="btn btn-secondary" onClick={() => setEdit(null)}>
+              Cancel
+            </button>
           </div>
         </div>
-      </section>
-
-      {/* Projects Section */}
-      <section id="projects" className="py-5">
-        <div className="container">
-          <h2 className="fw-bold mb-4">Projects</h2>
-
-          <div className="row g-4">
-            {[
-              {
-                title: "Student Management System",
-                desc: "CRUD based student management system using Spring Boot, React and MySQL.",
-              },
-              {
-                title: "Employee Management System",
-                desc: "Full CRUD employee dashboard with backend API integration.",
-              },
-              {
-                title: "Library Management System",
-                desc: "Book issuing, returning and inventory tracking using Java Full Stack.",
-              },
-            ].map((project) => (
-              <div className="col-md-4" key={project.title}>
-                <div className="card shadow-sm h-100">
-                  <div className="card-body">
-                    <h5 className="card-title fw-bold">{project.title}</h5>
-                    <p className="card-text">{project.desc}</p>
-                    <a
-                      href="https://github.com/vasudevkum"
-                      target="_blank" rel="noreferrer"
-                      className="btn btn-dark mt-2"
-                    >
-                      GitHub
-                    </a>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Contact Section */}
-      <section id="contact" className="py-5 bg-dark text-light">
-        <div className="container">
-          <h2 className="fw-bold mb-4">Contact</h2>
-          <p className="fs-5">Email: <a className="text-info" href="mailto:dev879636@gmail.com">dev879636@gmail.com</a></p>
-          <p className="fs-5">Phone: +91 7037839411</p>
-          <p className="fs-5">Location: Noida</p>
-          <p className="fs-5">GitHub: <a className="text-info" href="https://github.com/vasudevkum" target="_blank" rel="noreferrer">github.com/vasudevkum</a></p>
-        </div>
-      </section>
+      )}
     </div>
   );
 }
+
+export default App;

@@ -11,3 +11,30 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+.contact-box {
+  max-width: 500px;
+  margin: auto;
+  background: #ffffff;
+  border-radius: 16px;
+}
+
+.form-floating > label {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.form-control {
+  border-radius: 10px !important;
+}
+
+.form-control:focus {
+  border-color: #ffc107;
+  box-shadow: 0 0 8px rgba(255, 193, 7, 0.6);
+}
+
+.submit-btn:hover {
+  background-color: #ffb300;
+  transform: translateY(-2px);
+  transition: 0.2s ease;
+}
+
