@@ -4,7 +4,7 @@ import "./App.css";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-const API = "const API = "https://bannkingapplication-13.onrender.com/api/accounts";
+const API = "https://bannkingapplication-13.onrender.com/api/accounts";
 
 function App() {
   const [accounts, setAccounts] = useState([]);
